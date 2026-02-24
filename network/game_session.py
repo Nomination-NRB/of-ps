@@ -4,13 +4,14 @@ import socket
 from collections import deque
 from threading import Lock, Event, Thread
 from google.protobuf.message import Message
+from network.msg_id import MsgId
 
 try:
     import snappy_py as snappy  # http://github.com/byzp/snappy-py
 except ImportError:
     import snappy
 from config import Config
-from proto import OverField_pb2
+from proto.net_pb2 import ScenePlayer, PosColor, PacketHead
 from network.packet_factory import PacketFactory
 
 logger = logging.getLogger(__name__)
@@ -20,6 +21,12 @@ _HEADER_STRUCT = struct.Struct(">H")
 _UNAUTH_CMDS = frozenset((1001, 1007, 2201, 2203))
 _NOSEQ_CMDS = frozenset((1002, 1004, 1006, 1008))
 _COMPRESS_THRESHOLD = Config.COMPRESS_THRESHOLD
+
+id_to_name = {
+    v: k
+    for k, v in vars(MsgId).items()
+    if not k.startswith("__") and isinstance(v, int)
+}
 
 
 class SendTask:
@@ -59,6 +66,7 @@ class GameSession:
         "temp_pack",
         "pos",
         "drop_items",
+        "color_data",
         "running",
         "verified",
         "logged_in",
@@ -97,10 +105,15 @@ class GameSession:
         self.chat_channel_id = 1
         self.avatar_id = 41101
         self.badge_id = 0
-        self.scene_player = OverField_pb2.ScenePlayer()
+        self.scene_player = ScenePlayer()
         self.temp_pack = []
         self.pos = {}
         self.drop_items = {}
+        self.color_data = [
+            None,
+            None,
+            PosColor(),
+        ]  # SwirlNoiseGenHelper,noise_texture_id,color
 
         self.running = True
         self.verified = False
@@ -142,12 +155,12 @@ class GameSession:
             if hend > end:
                 break
 
-            head = OverField_pb2.PacketHead()
+            head = PacketHead()
             head.ParseFromString(bytes(self._recv_mv[pos + 2 : hend]))
 
             msg_id = head.msg_id
             if msg_id not in Config.DEBUG_PACKET_PASS:
-                logger.debug(f"Received message: {msg_id}")
+                logger.debug(f"Received message: {id_to_name.get(msg_id)}")
             # 阻止未授权访问
             if not self.verified and msg_id not in _UNAUTH_CMDS:
                 self.close()
@@ -172,7 +185,7 @@ class GameSession:
 
     def send(self, msg_id: int, message: Message, packet_id: int, is_bin: bool = False):
         if msg_id not in Config.DEBUG_PACKET_PASS:
-            logger.debug(f"Sending message: {msg_id}")
+            logger.debug(f"Sending message: {id_to_name.get(msg_id)}")
         if not self.running:
             return
 
@@ -199,7 +212,7 @@ class GameSession:
         out_buf = bytearray(65536)
 
         # 避免频繁创建销毁
-        head_proto = OverField_pb2.PacketHead()
+        head_proto = PacketHead()
 
         while self.running:
             event.wait()

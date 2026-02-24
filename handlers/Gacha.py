@@ -4,8 +4,7 @@ import logging
 import random
 import time
 
-import proto.OverField_pb2 as GachaReq_pb2
-import proto.OverField_pb2 as GachaRsp_pb2
+from proto.net_pb2 import GachaReq, GachaRsp
 
 from utils.res_loader import res
 import utils.db as db
@@ -52,11 +51,11 @@ def calc_extra_quality(item_id: int) -> int:
 @packet_handler(MsgId.GachaReq)
 class Handler(PacketHandler):
     def handle(self, session, data: bytes, packet_id: int):
-        req = GachaReq_pb2.GachaReq()
+        req = GachaReq()
         req.ParseFromString(data)
         logger.info(f"GachaReq => {req}")
 
-        rsp = GachaRsp_pb2.GachaRsp()
+        rsp = GachaRsp()
         rsp.status = 1
 
         # 抽卡次数
@@ -81,9 +80,7 @@ class Handler(PacketHandler):
             return
 
         # 所有 reward_pool_id
-        reward_pool_ids = [
-            i["free_gacha_pool_i_d"] for i in pool["items"]
-        ]
+        reward_pool_ids = [i["free_gacha_pool_i_d"] for i in pool["items"]]
 
         now_ts = int(time.time())
 
