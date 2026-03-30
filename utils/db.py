@@ -22,6 +22,7 @@ from proto.net_pb2 import (
     LifeBaseInfo,
     Chapter,
     MailContentType,
+    PBCollectionRewardData,
 )
 from utils.pb_create import make_item
 
@@ -262,6 +263,24 @@ def init():
             PRIMARY KEY (scene_id, channel_id, player_id, furniture_id),
             FOREIGN KEY(player_id) REFERENCES players(player_id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS areas (
+            player_id INTEGER NOT NULL,
+            scene_id INTEGER NOT NULL,
+            area_id INTEGER NOT NULL,
+            area_blob BLOB NOT NULL,
+            PRIMARY KEY (player_id, scene_id, area_id),
+            FOREIGN KEY(player_id) REFERENCES players(player_id) ON DELETE CASCADE
+        );
+
+        CREATE TABLE IF NOT EXISTS challenges (
+            player_id INTEGER NOT NULL,
+            scene_id INTEGER NOT NULL,
+            challenge_id INTEGER NOT NULL,
+            challenge_blob BLOB NOT NULL,
+            PRIMARY KEY (player_id, scene_id, challenge_id),
+            FOREIGN KEY(player_id) REFERENCES players(player_id) ON DELETE CASCADE
+        );
         
         CREATE INDEX IF NOT EXISTS idx_gacha_record_player ON gacha_record(player_id, gacha_id, gacha_time);
 
@@ -446,7 +465,7 @@ def init_player(player_id):
         set_bless_tree(player_id, tree["i_d"], tree_id)
     # 初始化空间收集物, 没有就是未收集
     # for collection_t in res["CollectionItem"]["collection_item"]["datas"]:
-    #     collection=pb.PBCollectionRewardData()
+    #     collection=PBCollectionRewardData()
     #     collection.item_id=collection_t["i_d"]
     #     set_collection(player_id,collection_t["i_d"],collection_t["new_collection_type"],collection.SerializeToString())
 
@@ -521,29 +540,26 @@ def get_player_id(user_id):
 
 def get_players_info(player_index, info_name):
     """获取玩家信息"""
-    # 如果是BLOB类型字段，需要反序列化
-    is_blob_field = info_name in ["team", "unlock_functions"]
-
     if isinstance(player_index, int):
         cur = db.execute(
             f"SELECT {info_name} FROM players WHERE player_id=?", (player_index,)
         )
-        row = cur.fetchone()
-        if row:
-            if is_blob_field and row[0]:
-                return pickle.loads(row[0])
-            return row[0]
-        return None
     else:
         cur = db.execute(
             f"SELECT {info_name} FROM players WHERE player_name=?", (player_index,)
         )
-        row = cur.fetchone()
-        if row:
-            if is_blob_field and row[0]:
-                return pickle.loads(row[0])
-            return row[0]
-        return None
+    row = cur.fetchone()
+    if row:
+        infos = []
+        # 如果是BLOB类型字段，需要反序列化
+        blob_fields = ["team", "unlock_functions"]
+        info_fields = info_name.split(",")
+        for i, info in enumerate(info_fields):
+            if info in blob_fields:
+                infos.append(pickle.loads(row[i]))
+            else:
+                infos.append(row[i])
+        return infos
 
 
 def get_player_name_exists(player_name):
@@ -821,8 +837,8 @@ def get_friend_info(player_id, friend_id=None, info_name="*"):
         )
         row = cur.fetchone()
         if row:
-            return row[0]
-        return None
+            return row
+        return [None]
     else:
         cur = db.execute(
             f"SELECT {info_name} FROM friend WHERE player_id=?",
@@ -1202,4 +1218,62 @@ def del_furniture(scene_id, channel_id, player_id, furniture_id):
     db.execute(
         "DELETE FROM furnitures WHERE scene_id=? AND channel_id=? AND player_id=? AND furniture_id=?",
         (scene_id, channel_id, player_id, furniture_id),
+    )
+
+
+def get_area(player_id, scene_id, area_id=None) -> list:
+    if area_id:
+        cur = db.execute(
+            "SELECT area_blob FROM areas WHERE player_id=? AND scene_id=? AND area_id=?",
+            (player_id, scene_id, area_id),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0]
+    else:
+        areas = []
+        cur = db.execute(
+            "SELECT area_blob FROM areas WHERE player_id=? AND scene_id=?",
+            (player_id, scene_id),
+        )
+        rows = cur.fetchall()
+        if rows:
+            for row in rows:
+                areas.append(row[0])
+        return areas
+
+
+def set_area(player_id, scene_id, area_id, area_blob):
+    db.execute(
+        "INSERT OR REPLACE INTO areas (player_id, scene_id, area_id, area_blob) VALUES (?, ?, ?, ?)",
+        (player_id, scene_id, area_id, area_blob),
+    )
+
+
+def get_challenge(player_id, scene_id, challenge_id=None) -> list:
+    if challenge_id:
+        cur = db.execute(
+            "SELECT challenge_blob FROM challenges WHERE player_id=? AND scene_id=? AND challenge_id=?",
+            (player_id, scene_id, challenge_id),
+        )
+        row = cur.fetchone()
+        if row:
+            return row[0]
+    else:
+        challenges = []
+        cur = db.execute(
+            "SELECT challenge_blob FROM challenges WHERE player_id=? AND scene_id=?",
+            (player_id, scene_id),
+        )
+        rows = cur.fetchall()
+        if rows:
+            for row in rows:
+                challenges.append(row[0])
+        return challenges
+
+
+def set_challenge(player_id, scene_id, challenge_id, challenge_blob):
+    db.execute(
+        "INSERT OR REPLACE INTO challenges (player_id, scene_id, challenge_id, challenge_blob) VALUES (?, ?, ?, ?)",
+        (player_id, scene_id, challenge_id, challenge_blob),
     )

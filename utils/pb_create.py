@@ -27,7 +27,7 @@ def make_ScenePlayer(session):
     player.food_buff_ids.extend([5013073])  # 食物buff ID
     player.global_buff_ids.extend([481, 491])  # 全局buff ID buff未实现
 
-    birthday_str = db.get_players_info(session.player_id, "birthday")
+    birthday_str, char_ids = db.get_players_info(session.player_id, "birthday,team")
     if birthday_str:
         birthday_date = datetime.strptime(birthday_str, "%Y-%m-%d")
         today = datetime.now()
@@ -37,7 +37,6 @@ def make_ScenePlayer(session):
     else:
         player.is_birthday = False  # 判断生日
 
-    char_ids = db.get_players_info(session.player_id, "team")
     player.team.CopyFrom(make_SceneTeam(session.player_id, char_ids))
 
 
@@ -559,6 +558,8 @@ def make_SceneDataNotice(session):
     rsp.status = StatusCode.StatusCode_OK
     data = rsp.data
     data.scene_id = session.scene_id
+    for i in db.get_area(session.player_id, session.scene_id):
+        data.areas.add().ParseFromString(i)
     pos = session.pos.get(session.scene_id)
     if pos:
         session.scene_player.team.char1.pos.CopyFrom(pos)
@@ -570,6 +571,8 @@ def make_SceneDataNotice(session):
         crd = PBCollectionRewardData()
         crd.ParseFromString(i[1])
         data.collections[i[0]].item_map[crd.item_id].CopyFrom(crd)
+    for i in db.get_challenge(session.player_id, session.scene_id):
+        data.challenges.add().ParseFromString(i)
     for furniture in db.get_furniture(
         session.scene_id, session.channel_id
     ):  # (scene_id, channel_id, player_id, furniture_id,furniture_detail_blob)
