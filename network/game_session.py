@@ -68,6 +68,7 @@ class GameSession:
         "drop_items",
         "color_data",
         "fishing",
+        "dungeon",
         "running",
         "verified",
         "logged_in",
@@ -99,8 +100,8 @@ class GameSession:
 
         self._seq_id = 1
 
-        self.player_id = None
-        self.player_name = None
+        self.player_id = 0
+        self.player_name = ""
         self.scene_id = 1
         self.channel_id = 1
         self.chat_channel_id = 1
@@ -116,6 +117,12 @@ class GameSession:
             PosColor(),
         ]  # SwirlNoiseGenHelper,noise_texture_id,color
         self.fishing = False
+        self.dungeon = [
+            0,
+            0,
+            0,
+            -1,
+        ]  # dungeon_id, start_time, use_time, double_team_iter
 
         self.running = True
         self.verified = False

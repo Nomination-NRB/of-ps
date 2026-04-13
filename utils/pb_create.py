@@ -563,6 +563,16 @@ def make_SceneDataNotice(session):
     pos = session.pos.get(session.scene_id)
     if pos:
         session.scene_player.team.char1.pos.CopyFrom(pos)
+    else:
+        pos = session.scene_player.team.char1.pos
+        rot = session.scene_player.team.char1.rot
+        for i in res["ScenesConfigAsset"]["Scenes"]:
+            if i["ID"] == session.scene_id:
+                pos.x = int(i["Born"][0]["Position"]["x"] * 100)
+                pos.y = int(i["Born"][0]["Position"]["y"] * 100)
+                pos.z = int(i["Born"][0]["Position"]["z"] * 100)
+                rot.y = int(i["Born"][0]["Rotation"]["y"] * 100)
+                break
     data.players.add().CopyFrom(session.scene_player)
     for i in range(0, 12):
         tmp = data.collections.add()
@@ -579,7 +589,9 @@ def make_SceneDataNotice(session):
         data.scene_garden_data.garden_furniture_info_map[furniture[3]].ParseFromString(
             furniture[4]
         )
-
+    for m in res["Flag"]["flag"]["datas"]:
+        if m["scene_i_d"] == session.scene_id and m["icon_i_d"] in [1, 7]:
+            rsp.data.flag_ids.append(m["i_d"])
     for i in scene_data.get_scene_player(session.scene_id, session.channel_id):
         data.players.add().CopyFrom(i)
     data.channel_id = session.channel_id
